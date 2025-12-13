@@ -484,12 +484,11 @@ export default function Admin() {
 
   const { data: adminSession, refetch: refetchSession } = useQuery<{ verified: boolean }>({
     queryKey: ["/api/admin/session"],
-    enabled: !!currentUser?.isAdmin,
   });
 
   const { data, isLoading } = useQuery<AdminData>({
     queryKey: ["/api/admin/dashboard"],
-    enabled: !!currentUser?.isAdmin && !!adminSession?.verified,
+    enabled: !!adminSession?.verified,
   });
 
   const createGameMutation = useMutation({
@@ -584,25 +583,6 @@ export default function Admin() {
       toast({ title: "Avatar removed from store" });
     },
   });
-
-  if (!currentUser) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground mb-3 text-sm">Please log in to access admin panel.</p>
-        <Button size="sm" asChild>
-          <Link href="/login">Login</Link>
-        </Button>
-      </div>
-    );
-  }
-
-  if (!currentUser.isAdmin) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground text-sm">You do not have admin access.</p>
-      </div>
-    );
-  }
 
   if (!adminSession?.verified) {
     return <AdminPasswordGate onVerified={() => refetchSession()} />;

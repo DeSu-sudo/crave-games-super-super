@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Category, User } from "@shared/schema";
 
 interface AppSidebarProps {
@@ -25,9 +26,7 @@ export function AppSidebar({ categories, currentUser, isOpen, onClose }: AppSide
     ? [{ href: "/favorites", label: "Favorites", icon: Heart }]
     : [];
 
-  const adminItems = currentUser?.isAdmin
-    ? [{ href: "/admin", label: "Admin Panel", icon: Shield }]
-    : [];
+  const adminItems = [{ href: "/admin", label: "Admin Panel", icon: Shield }];
 
   return (
     <>
@@ -203,11 +202,20 @@ export function AppSidebar({ categories, currentUser, isOpen, onClose }: AppSide
                   <LayoutGrid className="h-4 w-4" />
                 </Button>
               </Link>
-              <Link href="/logout" onClick={onClose}>
-                <Button variant="ghost" size="icon" title="Logout" data-testid="button-logout">
-                  <LogOut className="h-4 w-4" />
-                </Button>
-              </Link>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                title="Logout" 
+                data-testid="button-logout"
+                onClick={async () => {
+                  await apiRequest("POST", "/api/logout");
+                  queryClient.invalidateQueries({ queryKey: ["/api/me"] });
+                  onClose();
+                  window.location.href = "/";
+                }}
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         )}

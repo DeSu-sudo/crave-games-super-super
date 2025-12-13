@@ -399,7 +399,7 @@ export async function registerRoutes(
   }
 
   // Get admin dashboard data
-  app.get("/api/admin/dashboard", requireAdmin, requireAdminPassword, async (req, res) => {
+  app.get("/api/admin/dashboard", requireAdminPassword, async (req, res) => {
     const [games, categories, storeItems] = await Promise.all([
       storage.getGames(),
       storage.getCategories(),
@@ -409,7 +409,7 @@ export async function registerRoutes(
   });
 
   // GAMES CRUD
-  app.post("/api/admin/games", requireAdmin, requireAdminPassword, async (req, res) => {
+  app.post("/api/admin/games", requireAdminPassword, async (req, res) => {
     try {
       const parsed = insertGameSchema.parse(req.body);
       const game = await storage.createGame(parsed);
@@ -422,7 +422,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/admin/games/:id", requireAdmin, requireAdminPassword, async (req, res) => {
+  app.put("/api/admin/games/:id", requireAdminPassword, async (req, res) => {
     try {
       const game = await storage.updateGame(req.params.id, req.body);
       if (!game) {
@@ -434,13 +434,13 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/games/:id", requireAdmin, requireAdminPassword, async (req, res) => {
+  app.delete("/api/admin/games/:id", requireAdminPassword, async (req, res) => {
     await storage.deleteGame(req.params.id);
     res.json({ success: true });
   });
 
   // CATEGORIES CRUD
-  app.post("/api/admin/categories", requireAdmin, requireAdminPassword, async (req, res) => {
+  app.post("/api/admin/categories", requireAdminPassword, async (req, res) => {
     try {
       const parsed = insertCategorySchema.parse(req.body);
       const category = await storage.createCategory(parsed);
@@ -453,7 +453,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/admin/categories/:id", requireAdmin, requireAdminPassword, async (req, res) => {
+  app.put("/api/admin/categories/:id", requireAdminPassword, async (req, res) => {
     try {
       const category = await storage.updateCategory(req.params.id, req.body);
       if (!category) {
@@ -465,13 +465,13 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/categories/:id", requireAdmin, requireAdminPassword, async (req, res) => {
+  app.delete("/api/admin/categories/:id", requireAdminPassword, async (req, res) => {
     await storage.deleteCategory(req.params.id);
     res.json({ success: true });
   });
 
   // STORE ITEMS CRUD
-  app.post("/api/admin/store-items", requireAdmin, requireAdminPassword, async (req, res) => {
+  app.post("/api/admin/store-items", requireAdminPassword, async (req, res) => {
     try {
       const parsed = insertStoreItemSchema.parse(req.body);
       const item = await storage.createStoreItem(parsed);
@@ -484,7 +484,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/admin/store-items/:id", requireAdmin, requireAdminPassword, async (req, res) => {
+  app.put("/api/admin/store-items/:id", requireAdminPassword, async (req, res) => {
     try {
       const item = await storage.updateStoreItem(req.params.id, req.body);
       if (!item) {
@@ -496,7 +496,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/store-items/:id", requireAdmin, requireAdminPassword, async (req, res) => {
+  app.delete("/api/admin/store-items/:id", requireAdminPassword, async (req, res) => {
     await storage.deleteStoreItem(req.params.id);
     res.json({ success: true });
   });
@@ -504,7 +504,7 @@ export async function registerRoutes(
   // ==================== FILE UPLOAD ROUTES ====================
 
   // Upload avatar image
-  app.post("/api/admin/upload/avatar", requireAdmin, requireAdminPassword, upload.single("file"), async (req, res) => {
+  app.post("/api/admin/upload/avatar", requireAdminPassword, upload.single("file"), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -526,7 +526,7 @@ export async function registerRoutes(
   });
 
   // Upload game thumbnail
-  app.post("/api/admin/upload/thumbnail", requireAdmin, requireAdminPassword, upload.single("file"), async (req, res) => {
+  app.post("/api/admin/upload/thumbnail", requireAdminPassword, upload.single("file"), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -548,7 +548,7 @@ export async function registerRoutes(
   });
 
   // Upload HTML game file
-  app.post("/api/admin/upload/game", requireAdmin, requireAdminPassword, upload.single("file"), async (req, res) => {
+  app.post("/api/admin/upload/game", requireAdminPassword, upload.single("file"), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
