@@ -4,10 +4,10 @@ import { Search, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { Game, User } from "@shared/schema";
+import type { Game, UserWithAvatar } from "@shared/schema";
 
 interface HeaderProps {
-  currentUser: User | null;
+  currentUser: UserWithAvatar | null;
   games: Game[];
   menuButton?: React.ReactNode;
 }

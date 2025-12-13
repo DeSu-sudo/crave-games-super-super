@@ -69,7 +69,15 @@ export async function registerRoutes(
       return res.json(null);
     }
     const { password, ...userWithoutPassword } = user;
-    res.json(userWithoutPassword);
+    
+    // Fetch avatar image URL if user has an active avatar
+    let avatarImageUrl: string | null = null;
+    if (user.activeAvatarId) {
+      const avatarItem = await storage.getStoreItemById(user.activeAvatarId);
+      avatarImageUrl = avatarItem?.imageUrl || null;
+    }
+    
+    res.json({ ...userWithoutPassword, avatarImageUrl });
   });
 
   // Register
@@ -84,7 +92,9 @@ export async function registerRoutes(
       const user = await storage.createUser({ ...parsed, password: hashedPassword });
       req.session.userId = user.id;
       const { password, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
+      
+      // New users don't have an avatar yet, but include the field for type consistency
+      res.json({ ...userWithoutPassword, avatarImageUrl: null });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors[0].message });
@@ -107,7 +117,15 @@ export async function registerRoutes(
       }
       req.session.userId = user.id;
       const { password: _, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
+      
+      // Fetch avatar image URL if user has an active avatar
+      let avatarImageUrl: string | null = null;
+      if (user.activeAvatarId) {
+        const avatarItem = await storage.getStoreItemById(user.activeAvatarId);
+        avatarImageUrl = avatarItem?.imageUrl || null;
+      }
+      
+      res.json({ ...userWithoutPassword, avatarImageUrl });
     } catch (error) {
       res.status(500).json({ error: "Login failed" });
     }

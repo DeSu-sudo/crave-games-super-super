@@ -136,7 +136,7 @@ export default function GameDetail() {
               src={`/api/game/${game.id}/play`}
               className="w-full h-full"
               allowFullScreen
-              sandbox="allow-scripts allow-same-origin allow-forms"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-popups"
               data-testid="game-iframe-uploaded"
             />
           ) : (
@@ -145,7 +145,7 @@ export default function GameDetail() {
               src={game.iframeUrl || ""}
               className="w-full h-full"
               allowFullScreen
-              sandbox="allow-scripts allow-same-origin"
+              sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
               data-testid="game-iframe"
             />
           )}

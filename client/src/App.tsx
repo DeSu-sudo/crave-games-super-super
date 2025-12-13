@@ -18,12 +18,12 @@ import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Admin from "@/pages/Admin";
 import NotFound from "@/pages/not-found";
-import type { Category as CategoryType, Game, User } from "@shared/schema";
+import type { Category as CategoryType, Game, UserWithAvatar } from "@shared/schema";
 
 function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const { data: currentUser } = useQuery<User | null>({
+  const { data: currentUser } = useQuery<UserWithAvatar | null>({
     queryKey: ["/api/me"],
   });
 

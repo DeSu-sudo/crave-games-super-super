@@ -5,11 +5,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Category, User } from "@shared/schema";
+import type { Category, User, UserWithAvatar } from "@shared/schema";
 
 interface AppSidebarProps {
   categories: Category[];
-  currentUser: User | null;
+  currentUser: UserWithAvatar | null;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -191,7 +191,7 @@ export function AppSidebar({ categories, currentUser, isOpen, onClose }: AppSide
           <div className="p-3 border-t border-sidebar-border">
             <div className="flex items-center gap-3 p-2">
               <Avatar className="h-10 w-10 flex-shrink-0">
-                <AvatarImage src="/placeholder-avatar.png" alt={currentUser.username} />
+                <AvatarImage src={currentUser.avatarImageUrl || ""} alt={currentUser.username} />
                 <AvatarFallback className="bg-primary text-primary-foreground">
                   {currentUser.username.charAt(0).toUpperCase()}
                 </AvatarFallback>

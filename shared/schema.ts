@@ -142,3 +142,4 @@ export type Inventory = typeof inventory.$inferSelect;
 // Extended types for frontend
 export type GameWithCategory = Game & { categoryName: string };
 export type CommentWithUser = Comment & { username: string };
+export type UserWithAvatar = Omit<User, 'password'> & { avatarImageUrl: string | null };
