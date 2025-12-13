@@ -116,14 +116,30 @@ export default function GameDetail() {
       <div className="max-w-5xl mx-auto">
         {/* Game Frame */}
         <div className="relative w-full aspect-video bg-card rounded-xl overflow-hidden border border-border">
-          <iframe
-            id="gameFrame"
-            src={game.iframeUrl || ""}
-            className="w-full h-full"
-            allowFullScreen
-            sandbox="allow-scripts allow-same-origin"
-            data-testid="game-iframe"
-          />
+          {game.type === "flash" ? (
+            <object
+              id="gameFrame"
+              type="application/x-shockwave-flash"
+              data={game.iframeUrl || ""}
+              className="w-full h-full"
+              data-testid="game-flash"
+            >
+              <param name="allowFullScreen" value="true" />
+              <param name="allowScriptAccess" value="always" />
+              <p className="text-muted-foreground text-center p-4">
+                Flash content is loading...
+              </p>
+            </object>
+          ) : (
+            <iframe
+              id="gameFrame"
+              src={game.iframeUrl || ""}
+              className="w-full h-full"
+              allowFullScreen
+              sandbox="allow-scripts allow-same-origin"
+              data-testid="game-iframe"
+            />
+          )}
         </div>
 
         {/* Player Bar */}
