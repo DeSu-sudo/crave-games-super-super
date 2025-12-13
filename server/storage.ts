@@ -9,7 +9,7 @@ import {
   type Inventory, type InsertInventory,
   type CommentWithUser
 } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { supabase } from "./supabase";
 
 export interface IStorage {
   // Users
@@ -66,287 +66,503 @@ export interface IStorage {
   addToInventory(inventory: InsertInventory): Promise<Inventory>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private categories: Map<string, Category>;
-  private games: Map<string, Game>;
-  private favorites: Map<string, Favorite>;
-  private ratings: Map<string, Rating>;
-  private comments: Map<string, Comment>;
-  private storeItems: Map<string, StoreItem>;
-  private inventory: Map<string, Inventory>;
-
-  constructor() {
-    this.users = new Map();
-    this.categories = new Map();
-    this.games = new Map();
-    this.favorites = new Map();
-    this.ratings = new Map();
-    this.comments = new Map();
-    this.storeItems = new Map();
-    this.inventory = new Map();
-
-    this.seedData();
-  }
-
-  private seedData() {
-    // Seed only categories - games and avatars are added through admin panel
-    const categoryData = [
-      { name: "Action", icon: "gamepad-2" },
-      { name: "Puzzle", icon: "gamepad-2" },
-      { name: "Racing", icon: "gamepad-2" },
-      { name: "Sports", icon: "gamepad-2" },
-      { name: "Adventure", icon: "gamepad-2" },
-    ];
-
-    categoryData.forEach(cat => {
-      const id = randomUUID();
-      this.categories.set(id, { id, ...cat });
-    });
-  }
-
+export class SupabaseStorage implements IStorage {
   // Users
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const { data } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .single();
+    return data ? this.mapUser(data) : undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(user => user.username === username);
+    const { data } = await supabase
+      .from('users')
+      .select('*')
+      .eq('username', username)
+      .single();
+    return data ? this.mapUser(data) : undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const isFirstUser = this.users.size === 0;
-    const user: User = { ...insertUser, id, craveCoins: 100, activeAvatarId: null, isAdmin: isFirstUser };
-    this.users.set(id, user);
-    return user;
+    const { count } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true });
+    
+    const isFirstUser = count === 0;
+    
+    const { data, error } = await supabase
+      .from('users')
+      .insert({
+        username: insertUser.username,
+        password: insertUser.password,
+        crave_coins: 100,
+        active_avatar_id: null,
+        is_admin: isFirstUser
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return this.mapUser(data);
   }
 
   async updateUserCoins(userId: string, coins: number): Promise<void> {
-    const user = this.users.get(userId);
-    if (user) {
-      user.craveCoins = coins;
-      this.users.set(userId, user);
-    }
+    await supabase
+      .from('users')
+      .update({ crave_coins: coins })
+      .eq('id', userId);
   }
 
   async updateUserAvatar(userId: string, avatarId: string | null): Promise<void> {
-    const user = this.users.get(userId);
-    if (user) {
-      user.activeAvatarId = avatarId;
-      this.users.set(userId, user);
-    }
+    await supabase
+      .from('users')
+      .update({ active_avatar_id: avatarId })
+      .eq('id', userId);
+  }
+
+  private mapUser(data: any): User {
+    return {
+      id: data.id,
+      username: data.username,
+      password: data.password,
+      craveCoins: data.crave_coins,
+      activeAvatarId: data.active_avatar_id,
+      isAdmin: data.is_admin
+    };
   }
 
   // Categories
   async getCategories(): Promise<Category[]> {
-    return Array.from(this.categories.values());
+    const { data } = await supabase
+      .from('categories')
+      .select('*');
+    return (data || []).map(this.mapCategory);
   }
 
   async getCategoryByName(name: string): Promise<Category | undefined> {
-    return Array.from(this.categories.values()).find(cat => cat.name.toLowerCase() === name.toLowerCase());
+    const { data } = await supabase
+      .from('categories')
+      .select('*')
+      .ilike('name', name)
+      .single();
+    return data ? this.mapCategory(data) : undefined;
   }
 
   async getCategoryById(id: string): Promise<Category | undefined> {
-    return this.categories.get(id);
+    const { data } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('id', id)
+      .single();
+    return data ? this.mapCategory(data) : undefined;
   }
 
   async createCategory(category: InsertCategory): Promise<Category> {
-    const id = randomUUID();
-    const newCategory: Category = { id, ...category };
-    this.categories.set(id, newCategory);
-    return newCategory;
+    const { data, error } = await supabase
+      .from('categories')
+      .insert({
+        name: category.name,
+        icon: category.icon || 'gamepad-2'
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return this.mapCategory(data);
   }
 
   async updateCategory(id: string, category: Partial<InsertCategory>): Promise<Category | undefined> {
-    const existing = this.categories.get(id);
-    if (!existing) return undefined;
-    const updated: Category = { ...existing, ...category };
-    this.categories.set(id, updated);
-    return updated;
+    const { data } = await supabase
+      .from('categories')
+      .update(category)
+      .eq('id', id)
+      .select()
+      .single();
+    return data ? this.mapCategory(data) : undefined;
   }
 
   async deleteCategory(id: string): Promise<void> {
-    this.categories.delete(id);
+    await supabase.from('categories').delete().eq('id', id);
+  }
+
+  private mapCategory(data: any): Category {
+    return {
+      id: data.id,
+      name: data.name,
+      icon: data.icon
+    };
   }
 
   // Games
   async getGames(): Promise<Game[]> {
-    return Array.from(this.games.values());
+    const { data } = await supabase
+      .from('games')
+      .select('*');
+    return (data || []).map(this.mapGame);
   }
 
   async getGameById(id: string): Promise<Game | undefined> {
-    return this.games.get(id);
+    const { data } = await supabase
+      .from('games')
+      .select('*')
+      .eq('id', id)
+      .single();
+    return data ? this.mapGame(data) : undefined;
   }
 
   async getGamesByCategory(categoryId: string): Promise<Game[]> {
-    return Array.from(this.games.values()).filter(game => game.categoryId === categoryId);
+    const { data } = await supabase
+      .from('games')
+      .select('*')
+      .eq('category_id', categoryId);
+    return (data || []).map(this.mapGame);
   }
 
   async getTrendingGames(): Promise<Game[]> {
-    return Array.from(this.games.values()).filter(game => game.isTrending);
+    const { data } = await supabase
+      .from('games')
+      .select('*')
+      .eq('is_trending', true);
+    return (data || []).map(this.mapGame);
   }
 
   async incrementPlayCount(gameId: string): Promise<void> {
-    const game = this.games.get(gameId);
+    const game = await this.getGameById(gameId);
     if (game) {
-      game.playCount += 1;
-      this.games.set(gameId, game);
+      await supabase
+        .from('games')
+        .update({ play_count: game.playCount + 1 })
+        .eq('id', gameId);
     }
   }
 
   async updateGameRating(gameId: string, avgRating: number, count: number): Promise<void> {
-    const game = this.games.get(gameId);
-    if (game) {
-      game.averageRating = avgRating;
-      game.ratingCount = count;
-      this.games.set(gameId, game);
-    }
+    await supabase
+      .from('games')
+      .update({ average_rating: avgRating, rating_count: count })
+      .eq('id', gameId);
   }
 
   async createGame(game: InsertGame): Promise<Game> {
-    const id = randomUUID();
-    const newGame: Game = {
-      id,
-      name: game.name,
-      description: game.description || null,
-      instructions: game.instructions || null,
-      categoryId: game.categoryId,
-      thumbnailUrl: game.thumbnailUrl,
-      iframeUrl: game.iframeUrl || null,
-      type: game.type || "iframe",
-      playCount: 0,
-      averageRating: 0,
-      ratingCount: 0,
-      badge: game.badge || null,
-      isTrending: game.isTrending || false,
-    };
-    this.games.set(id, newGame);
-    return newGame;
+    const { data, error } = await supabase
+      .from('games')
+      .insert({
+        name: game.name,
+        description: game.description || null,
+        instructions: game.instructions || null,
+        category_id: game.categoryId,
+        thumbnail_url: game.thumbnailUrl,
+        iframe_url: game.iframeUrl || null,
+        html_content: game.htmlContent || null,
+        type: game.type || 'iframe',
+        play_count: 0,
+        average_rating: 0,
+        rating_count: 0,
+        badge: game.badge || null,
+        is_trending: game.isTrending || false
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return this.mapGame(data);
   }
 
   async updateGame(id: string, game: Partial<InsertGame>): Promise<Game | undefined> {
-    const existing = this.games.get(id);
-    if (!existing) return undefined;
-    const updated: Game = { ...existing, ...game };
-    this.games.set(id, updated);
-    return updated;
+    const updateData: any = {};
+    if (game.name !== undefined) updateData.name = game.name;
+    if (game.description !== undefined) updateData.description = game.description;
+    if (game.instructions !== undefined) updateData.instructions = game.instructions;
+    if (game.categoryId !== undefined) updateData.category_id = game.categoryId;
+    if (game.thumbnailUrl !== undefined) updateData.thumbnail_url = game.thumbnailUrl;
+    if (game.iframeUrl !== undefined) updateData.iframe_url = game.iframeUrl;
+    if (game.htmlContent !== undefined) updateData.html_content = game.htmlContent;
+    if (game.type !== undefined) updateData.type = game.type;
+    if (game.badge !== undefined) updateData.badge = game.badge;
+    if (game.isTrending !== undefined) updateData.is_trending = game.isTrending;
+
+    const { data } = await supabase
+      .from('games')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+    return data ? this.mapGame(data) : undefined;
   }
 
   async deleteGame(id: string): Promise<void> {
-    this.games.delete(id);
+    await supabase.from('games').delete().eq('id', id);
+  }
+
+  private mapGame(data: any): Game {
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description,
+      instructions: data.instructions,
+      categoryId: data.category_id,
+      thumbnailUrl: data.thumbnail_url,
+      iframeUrl: data.iframe_url,
+      htmlContent: data.html_content,
+      type: data.type,
+      playCount: data.play_count,
+      averageRating: data.average_rating,
+      ratingCount: data.rating_count,
+      badge: data.badge,
+      isTrending: data.is_trending
+    };
   }
 
   // Favorites
   async getFavoritesByUser(userId: string): Promise<Favorite[]> {
-    return Array.from(this.favorites.values()).filter(fav => fav.userId === userId);
+    const { data } = await supabase
+      .from('favorites')
+      .select('*')
+      .eq('user_id', userId);
+    return (data || []).map(this.mapFavorite);
   }
 
   async getFavorite(userId: string, gameId: string): Promise<Favorite | undefined> {
-    return Array.from(this.favorites.values()).find(fav => fav.userId === userId && fav.gameId === gameId);
+    const { data } = await supabase
+      .from('favorites')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('game_id', gameId)
+      .single();
+    return data ? this.mapFavorite(data) : undefined;
   }
 
   async addFavorite(favorite: InsertFavorite): Promise<Favorite> {
-    const id = randomUUID();
-    const newFavorite: Favorite = { ...favorite, id };
-    this.favorites.set(id, newFavorite);
-    return newFavorite;
+    const { data, error } = await supabase
+      .from('favorites')
+      .insert({
+        user_id: favorite.userId,
+        game_id: favorite.gameId
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return this.mapFavorite(data);
   }
 
   async removeFavorite(userId: string, gameId: string): Promise<void> {
-    const favorite = await this.getFavorite(userId, gameId);
-    if (favorite) {
-      this.favorites.delete(favorite.id);
-    }
+    await supabase
+      .from('favorites')
+      .delete()
+      .eq('user_id', userId)
+      .eq('game_id', gameId);
+  }
+
+  private mapFavorite(data: any): Favorite {
+    return {
+      id: data.id,
+      userId: data.user_id,
+      gameId: data.game_id
+    };
   }
 
   // Ratings
   async getRatingsByGame(gameId: string): Promise<Rating[]> {
-    return Array.from(this.ratings.values()).filter(rating => rating.gameId === gameId);
+    const { data } = await supabase
+      .from('ratings')
+      .select('*')
+      .eq('game_id', gameId);
+    return (data || []).map(this.mapRating);
   }
 
   async getRating(userId: string, gameId: string): Promise<Rating | undefined> {
-    return Array.from(this.ratings.values()).find(rating => rating.userId === userId && rating.gameId === gameId);
+    const { data } = await supabase
+      .from('ratings')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('game_id', gameId)
+      .single();
+    return data ? this.mapRating(data) : undefined;
   }
 
   async upsertRating(rating: InsertRating): Promise<Rating> {
     const existing = await this.getRating(rating.userId, rating.gameId);
+    
     if (existing) {
-      existing.rating = rating.rating;
-      this.ratings.set(existing.id, existing);
-      return existing;
+      const { data, error } = await supabase
+        .from('ratings')
+        .update({ rating: rating.rating })
+        .eq('id', existing.id)
+        .select()
+        .single();
+      if (error) throw error;
+      return this.mapRating(data);
     }
-    const id = randomUUID();
-    const newRating: Rating = { ...rating, id };
-    this.ratings.set(id, newRating);
-    return newRating;
+
+    const { data, error } = await supabase
+      .from('ratings')
+      .insert({
+        user_id: rating.userId,
+        game_id: rating.gameId,
+        rating: rating.rating
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return this.mapRating(data);
+  }
+
+  private mapRating(data: any): Rating {
+    return {
+      id: data.id,
+      userId: data.user_id,
+      gameId: data.game_id,
+      rating: data.rating
+    };
   }
 
   // Comments
   async getCommentsByGame(gameId: string): Promise<CommentWithUser[]> {
-    const comments = Array.from(this.comments.values())
-      .filter(comment => comment.gameId === gameId)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    
-    return Promise.all(comments.map(async comment => {
-      const user = await this.getUser(comment.userId);
-      return {
-        ...comment,
-        username: user?.username || "Unknown"
-      };
+    const { data } = await supabase
+      .from('comments')
+      .select('*, users(username)')
+      .eq('game_id', gameId)
+      .order('created_at', { ascending: false });
+
+    return (data || []).map((comment: any) => ({
+      id: comment.id,
+      userId: comment.user_id,
+      gameId: comment.game_id,
+      content: comment.content,
+      createdAt: new Date(comment.created_at),
+      username: comment.users?.username || 'Unknown'
     }));
   }
 
   async addComment(comment: InsertComment): Promise<Comment> {
-    const id = randomUUID();
-    const newComment: Comment = { ...comment, id, createdAt: new Date() };
-    this.comments.set(id, newComment);
-    return newComment;
+    const { data, error } = await supabase
+      .from('comments')
+      .insert({
+        user_id: comment.userId,
+        game_id: comment.gameId,
+        content: comment.content
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return {
+      id: data.id,
+      userId: data.user_id,
+      gameId: data.game_id,
+      content: data.content,
+      createdAt: new Date(data.created_at)
+    };
   }
 
   // Store
   async getStoreItems(): Promise<StoreItem[]> {
-    return Array.from(this.storeItems.values());
+    const { data } = await supabase
+      .from('store_items')
+      .select('*');
+    return (data || []).map(this.mapStoreItem);
   }
 
   async getStoreItemById(id: string): Promise<StoreItem | undefined> {
-    return this.storeItems.get(id);
+    const { data } = await supabase
+      .from('store_items')
+      .select('*')
+      .eq('id', id)
+      .single();
+    return data ? this.mapStoreItem(data) : undefined;
   }
 
   async createStoreItem(item: InsertStoreItem): Promise<StoreItem> {
-    const id = randomUUID();
-    const newItem: StoreItem = { id, ...item };
-    this.storeItems.set(id, newItem);
-    return newItem;
+    const { data, error } = await supabase
+      .from('store_items')
+      .insert({
+        name: item.name,
+        image_url: item.imageUrl,
+        price: item.price,
+        item_type: item.itemType || 'avatar'
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return this.mapStoreItem(data);
   }
 
   async updateStoreItem(id: string, item: Partial<InsertStoreItem>): Promise<StoreItem | undefined> {
-    const existing = this.storeItems.get(id);
-    if (!existing) return undefined;
-    const updated: StoreItem = { ...existing, ...item };
-    this.storeItems.set(id, updated);
-    return updated;
+    const updateData: any = {};
+    if (item.name !== undefined) updateData.name = item.name;
+    if (item.imageUrl !== undefined) updateData.image_url = item.imageUrl;
+    if (item.price !== undefined) updateData.price = item.price;
+    if (item.itemType !== undefined) updateData.item_type = item.itemType;
+
+    const { data } = await supabase
+      .from('store_items')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+    return data ? this.mapStoreItem(data) : undefined;
   }
 
   async deleteStoreItem(id: string): Promise<void> {
-    this.storeItems.delete(id);
+    await supabase.from('store_items').delete().eq('id', id);
+  }
+
+  private mapStoreItem(data: any): StoreItem {
+    return {
+      id: data.id,
+      name: data.name,
+      imageUrl: data.image_url,
+      price: data.price,
+      itemType: data.item_type
+    };
   }
 
   // Inventory
   async getInventoryByUser(userId: string): Promise<Inventory[]> {
-    return Array.from(this.inventory.values()).filter(inv => inv.userId === userId);
+    const { data } = await supabase
+      .from('inventory')
+      .select('*')
+      .eq('user_id', userId);
+    return (data || []).map(this.mapInventory);
   }
 
   async getInventoryItem(userId: string, itemId: string): Promise<Inventory | undefined> {
-    return Array.from(this.inventory.values()).find(inv => inv.userId === userId && inv.itemId === itemId);
+    const { data } = await supabase
+      .from('inventory')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('item_id', itemId)
+      .single();
+    return data ? this.mapInventory(data) : undefined;
   }
 
   async addToInventory(inventory: InsertInventory): Promise<Inventory> {
-    const id = randomUUID();
-    const newInventory: Inventory = { ...inventory, id };
-    this.inventory.set(id, newInventory);
-    return newInventory;
+    const { data, error } = await supabase
+      .from('inventory')
+      .insert({
+        user_id: inventory.userId,
+        item_id: inventory.itemId
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return this.mapInventory(data);
+  }
+
+  private mapInventory(data: any): Inventory {
+    return {
+      id: data.id,
+      userId: data.user_id,
+      itemId: data.item_id
+    };
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new SupabaseStorage();
