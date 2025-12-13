@@ -22,6 +22,10 @@ export interface IStorage {
   // Categories
   getCategories(): Promise<Category[]>;
   getCategoryByName(name: string): Promise<Category | undefined>;
+  getCategoryById(id: string): Promise<Category | undefined>;
+  createCategory(category: InsertCategory): Promise<Category>;
+  updateCategory(id: string, category: Partial<InsertCategory>): Promise<Category | undefined>;
+  deleteCategory(id: string): Promise<void>;
 
   // Games
   getGames(): Promise<Game[]>;
@@ -30,6 +34,9 @@ export interface IStorage {
   getTrendingGames(): Promise<Game[]>;
   incrementPlayCount(gameId: string): Promise<void>;
   updateGameRating(gameId: string, avgRating: number, count: number): Promise<void>;
+  createGame(game: InsertGame): Promise<Game>;
+  updateGame(id: string, game: Partial<InsertGame>): Promise<Game | undefined>;
+  deleteGame(id: string): Promise<void>;
 
   // Favorites
   getFavoritesByUser(userId: string): Promise<Favorite[]>;
@@ -49,6 +56,9 @@ export interface IStorage {
   // Store
   getStoreItems(): Promise<StoreItem[]>;
   getStoreItemById(id: string): Promise<StoreItem | undefined>;
+  createStoreItem(item: InsertStoreItem): Promise<StoreItem>;
+  updateStoreItem(id: string, item: Partial<InsertStoreItem>): Promise<StoreItem | undefined>;
+  deleteStoreItem(id: string): Promise<void>;
 
   // Inventory
   getInventoryByUser(userId: string): Promise<Inventory[]>;
@@ -167,7 +177,7 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id, craveCoins: 100, activeAvatarId: null };
+    const user: User = { ...insertUser, id, craveCoins: 100, activeAvatarId: null, isAdmin: false };
     this.users.set(id, user);
     return user;
   }
@@ -195,6 +205,29 @@ export class MemStorage implements IStorage {
 
   async getCategoryByName(name: string): Promise<Category | undefined> {
     return Array.from(this.categories.values()).find(cat => cat.name.toLowerCase() === name.toLowerCase());
+  }
+
+  async getCategoryById(id: string): Promise<Category | undefined> {
+    return this.categories.get(id);
+  }
+
+  async createCategory(category: InsertCategory): Promise<Category> {
+    const id = randomUUID();
+    const newCategory: Category = { id, ...category };
+    this.categories.set(id, newCategory);
+    return newCategory;
+  }
+
+  async updateCategory(id: string, category: Partial<InsertCategory>): Promise<Category | undefined> {
+    const existing = this.categories.get(id);
+    if (!existing) return undefined;
+    const updated: Category = { ...existing, ...category };
+    this.categories.set(id, updated);
+    return updated;
+  }
+
+  async deleteCategory(id: string): Promise<void> {
+    this.categories.delete(id);
   }
 
   // Games
@@ -229,6 +262,39 @@ export class MemStorage implements IStorage {
       game.ratingCount = count;
       this.games.set(gameId, game);
     }
+  }
+
+  async createGame(game: InsertGame): Promise<Game> {
+    const id = randomUUID();
+    const newGame: Game = {
+      id,
+      name: game.name,
+      description: game.description || null,
+      instructions: game.instructions || null,
+      categoryId: game.categoryId,
+      thumbnailUrl: game.thumbnailUrl,
+      iframeUrl: game.iframeUrl || null,
+      type: game.type || "iframe",
+      playCount: 0,
+      averageRating: 0,
+      ratingCount: 0,
+      badge: game.badge || null,
+      isTrending: game.isTrending || false,
+    };
+    this.games.set(id, newGame);
+    return newGame;
+  }
+
+  async updateGame(id: string, game: Partial<InsertGame>): Promise<Game | undefined> {
+    const existing = this.games.get(id);
+    if (!existing) return undefined;
+    const updated: Game = { ...existing, ...game };
+    this.games.set(id, updated);
+    return updated;
+  }
+
+  async deleteGame(id: string): Promise<void> {
+    this.games.delete(id);
   }
 
   // Favorites
@@ -305,6 +371,25 @@ export class MemStorage implements IStorage {
 
   async getStoreItemById(id: string): Promise<StoreItem | undefined> {
     return this.storeItems.get(id);
+  }
+
+  async createStoreItem(item: InsertStoreItem): Promise<StoreItem> {
+    const id = randomUUID();
+    const newItem: StoreItem = { id, ...item };
+    this.storeItems.set(id, newItem);
+    return newItem;
+  }
+
+  async updateStoreItem(id: string, item: Partial<InsertStoreItem>): Promise<StoreItem | undefined> {
+    const existing = this.storeItems.get(id);
+    if (!existing) return undefined;
+    const updated: StoreItem = { ...existing, ...item };
+    this.storeItems.set(id, updated);
+    return updated;
+  }
+
+  async deleteStoreItem(id: string): Promise<void> {
+    this.storeItems.delete(id);
   }
 
   // Inventory

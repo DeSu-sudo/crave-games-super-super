@@ -9,6 +9,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   craveCoins: integer("crave_coins").notNull().default(0),
   activeAvatarId: varchar("active_avatar_id"),
+  isAdmin: boolean("is_admin").notNull().default(false),
 });
 
 export const categories = pgTable("categories", {
