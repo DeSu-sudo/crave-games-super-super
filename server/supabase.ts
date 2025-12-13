@@ -1,21 +1,8 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 
-let supabaseClient: SupabaseClient | null = null;
-
-export function getSupabaseClient(): SupabaseClient | null {
-  if (supabaseClient) return supabaseClient;
-
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    console.warn("Supabase not configured - SUPABASE_URL and SUPABASE_ANON_KEY required for file uploads");
-    return null;
-  }
-
-  supabaseClient = createClient(supabaseUrl, supabaseKey);
-  return supabaseClient;
-}
+const supabaseUrl = 'https://vcivufhnyrctebcvjrbf.supabase.co'
+const supabaseKey = process.env.SUPABASE_KEY
+export const supabase = createClient(supabaseUrl, supabaseKey!)
 
 export async function uploadFile(
   bucket: string,
@@ -23,10 +10,7 @@ export async function uploadFile(
   file: Buffer,
   contentType: string
 ): Promise<string | null> {
-  const client = getSupabaseClient();
-  if (!client) return null;
-
-  const { data, error } = await client.storage
+  const { data, error } = await supabase.storage
     .from(bucket)
     .upload(path, file, {
       contentType,
@@ -38,14 +22,11 @@ export async function uploadFile(
     return null;
   }
 
-  const { data: urlData } = client.storage.from(bucket).getPublicUrl(path);
+  const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
   return urlData.publicUrl;
 }
 
 export async function deleteFile(bucket: string, path: string): Promise<boolean> {
-  const client = getSupabaseClient();
-  if (!client) return false;
-
-  const { error } = await client.storage.from(bucket).remove([path]);
+  const { error } = await supabase.storage.from(bucket).remove([path]);
   return !error;
 }
