@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { FileDropzone } from "@/components/ui/file-dropzone";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Game, Category, StoreItem, User } from "@shared/schema";
@@ -33,6 +34,7 @@ function GameForm({
   onSubmit: (data: any) => void; 
   onCancel: () => void;
 }) {
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     name: game?.name || "",
     description: game?.description || "",
@@ -40,10 +42,64 @@ function GameForm({
     categoryId: game?.categoryId || "",
     thumbnailUrl: game?.thumbnailUrl || "",
     iframeUrl: game?.iframeUrl || "",
+    htmlContent: (game as any)?.htmlContent || "",
     type: game?.type || "iframe",
     badge: game?.badge || "",
     isTrending: game?.isTrending || false,
   });
+  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
+  const [uploadingGame, setUploadingGame] = useState(false);
+  const [gameFileName, setGameFileName] = useState("");
+
+  const handleThumbnailUpload = async (file: File) => {
+    setUploadingThumbnail(true);
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append("file", file);
+      const response = await fetch("/api/admin/upload/thumbnail", {
+        method: "POST",
+        body: formDataUpload,
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Upload failed");
+      }
+      const { url } = await response.json();
+      setFormData((prev) => ({ ...prev, thumbnailUrl: url }));
+      toast({ title: "Thumbnail uploaded!" });
+    } catch (error: any) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } finally {
+      setUploadingThumbnail(false);
+    }
+  };
+
+  const handleGameUpload = async (file: File) => {
+    setUploadingGame(true);
+    setGameFileName(file.name);
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append("file", file);
+      const response = await fetch("/api/admin/upload/game", {
+        method: "POST",
+        body: formDataUpload,
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Upload failed");
+      }
+      const { htmlContent } = await response.json();
+      setFormData((prev) => ({ ...prev, htmlContent, type: "uploaded" }));
+      toast({ title: "Game file uploaded!" });
+    } catch (error: any) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+      setGameFileName("");
+    } finally {
+      setUploadingGame(false);
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -94,43 +150,73 @@ function GameForm({
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs">Thumbnail URL</Label>
-          <Input
-            value={formData.thumbnailUrl}
-            onChange={(e) => setFormData({ ...formData, thumbnailUrl: e.target.value })}
-            placeholder="https://example.com/image.jpg"
-            data-testid="input-thumbnail-url"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Game Type</Label>
-          <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v })}>
-            <SelectTrigger data-testid="select-game-type">
-              <SelectValue placeholder="Select type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="iframe">Iframe (HTML5)</SelectItem>
-              <SelectItem value="flash">Flash (Ruffle)</SelectItem>
-              <SelectItem value="embed">Embed Code</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="space-y-1">
+        <Label className="text-xs">Thumbnail</Label>
+        <FileDropzone
+          accept="image/*"
+          variant="image"
+          label="Drop thumbnail image or tap to browse"
+          hint="JPG, PNG, GIF up to 10MB"
+          preview={formData.thumbnailUrl || null}
+          isUploading={uploadingThumbnail}
+          onFileSelect={handleThumbnailUpload}
+          onClear={() => setFormData((prev) => ({ ...prev, thumbnailUrl: "" }))}
+        />
+        <Input
+          value={formData.thumbnailUrl}
+          onChange={(e) => setFormData({ ...formData, thumbnailUrl: e.target.value })}
+          placeholder="Or enter URL directly"
+          className="mt-2"
+          data-testid="input-thumbnail-url"
+        />
       </div>
 
       <div className="space-y-1">
-        <Label className="text-xs">Game URL / Embed Source</Label>
-        <Input
-          value={formData.iframeUrl}
-          onChange={(e) => setFormData({ ...formData, iframeUrl: e.target.value })}
-          placeholder="https://example.com/game or .swf URL for Flash"
-          data-testid="input-game-url"
-        />
-        <p className="text-xs text-muted-foreground">
-          For HTML5: Direct URL. For Flash: URL to .swf file.
-        </p>
+        <Label className="text-xs">Game Type</Label>
+        <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v })}>
+          <SelectTrigger data-testid="select-game-type">
+            <SelectValue placeholder="Select type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="iframe">Iframe (External URL)</SelectItem>
+            <SelectItem value="uploaded">Uploaded HTML Game</SelectItem>
+            <SelectItem value="flash">Flash (Ruffle)</SelectItem>
+            <SelectItem value="embed">Embed Code</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
+
+      {formData.type === "uploaded" ? (
+        <div className="space-y-1">
+          <Label className="text-xs">HTML Game File</Label>
+          <FileDropzone
+            accept=".html,.htm"
+            variant="file"
+            label="Drop HTML game file or tap to browse"
+            hint="Single HTML file with embedded assets"
+            uploadedFileName={gameFileName || (formData.htmlContent ? "Game uploaded" : undefined)}
+            isUploading={uploadingGame}
+            onFileSelect={handleGameUpload}
+            onClear={() => {
+              setFormData((prev) => ({ ...prev, htmlContent: "" }));
+              setGameFileName("");
+            }}
+          />
+        </div>
+      ) : (
+        <div className="space-y-1">
+          <Label className="text-xs">Game URL / Embed Source</Label>
+          <Input
+            value={formData.iframeUrl}
+            onChange={(e) => setFormData({ ...formData, iframeUrl: e.target.value })}
+            placeholder="https://example.com/game or .swf URL for Flash"
+            data-testid="input-game-url"
+          />
+          <p className="text-xs text-muted-foreground">
+            For Iframe: Direct URL. For Flash: URL to .swf file.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="space-y-1">
@@ -223,12 +309,38 @@ function StoreItemForm({
   onSubmit: (data: any) => void; 
   onCancel: () => void;
 }) {
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     name: item?.name || "",
     imageUrl: item?.imageUrl || "",
     price: item?.price || 100,
     itemType: item?.itemType || "avatar",
   });
+  const [uploading, setUploading] = useState(false);
+
+  const handleAvatarUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append("file", file);
+      const response = await fetch("/api/admin/upload/avatar", {
+        method: "POST",
+        body: formDataUpload,
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Upload failed");
+      }
+      const { url } = await response.json();
+      setFormData((prev) => ({ ...prev, imageUrl: url }));
+      toast({ title: "Avatar uploaded!" });
+    } catch (error: any) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -242,16 +354,24 @@ function StoreItemForm({
         />
       </div>
       <div className="space-y-1">
-        <Label className="text-xs">Image URL</Label>
+        <Label className="text-xs">Avatar Image</Label>
+        <FileDropzone
+          accept="image/*"
+          variant="image"
+          label="Drop avatar image or tap to browse"
+          hint="JPG, PNG, GIF up to 10MB"
+          preview={formData.imageUrl || null}
+          isUploading={uploading}
+          onFileSelect={handleAvatarUpload}
+          onClear={() => setFormData((prev) => ({ ...prev, imageUrl: "" }))}
+        />
         <Input
           value={formData.imageUrl}
           onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-          placeholder="https://example.com/avatar.png"
+          placeholder="Or enter URL directly (e.g., dicebear.com)"
+          className="mt-2"
           data-testid="input-avatar-image"
         />
-        <p className="text-xs text-muted-foreground">
-          Use dicebear.com for generated avatars
-        </p>
       </div>
       <div className="space-y-1">
         <Label className="text-xs">Price (Crave Coins)</Label>

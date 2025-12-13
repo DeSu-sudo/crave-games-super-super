@@ -26,6 +26,7 @@ export const games = pgTable("games", {
   categoryId: varchar("category_id").notNull(),
   thumbnailUrl: text("thumbnail_url").notNull(),
   iframeUrl: text("iframe_url"),
+  htmlContent: text("html_content"),
   type: text("type").notNull().default("iframe"),
   playCount: integer("play_count").notNull().default(0),
   averageRating: real("average_rating").notNull().default(0),

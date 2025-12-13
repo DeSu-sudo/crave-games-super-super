@@ -2,9 +2,16 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import bcrypt from "bcrypt";
+import multer from "multer";
 import { storage } from "./storage";
+import { uploadFile, getSupabaseClient } from "./supabase";
 import { insertUserSchema, insertCommentSchema, insertRatingSchema, insertGameSchema, insertCategorySchema, insertStoreItemSchema } from "@shared/schema";
 import { z } from "zod";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
 
 const SALT_ROUNDS = 10;
 
@@ -492,6 +499,94 @@ export async function registerRoutes(
   app.delete("/api/admin/store-items/:id", requireAdmin, requireAdminPassword, async (req, res) => {
     await storage.deleteStoreItem(req.params.id);
     res.json({ success: true });
+  });
+
+  // ==================== FILE UPLOAD ROUTES ====================
+
+  // Upload avatar image
+  app.post("/api/admin/upload/avatar", requireAdmin, requireAdminPassword, upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        return res.status(500).json({ error: "File storage not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY." });
+      }
+
+      const ext = req.file.originalname.split(".").pop() || "png";
+      const filename = `avatar-${Date.now()}.${ext}`;
+      const url = await uploadFile("avatars", filename, req.file.buffer, req.file.mimetype);
+
+      if (!url) {
+        return res.status(500).json({ error: "Upload failed" });
+      }
+
+      res.json({ url });
+    } catch (error) {
+      console.error("Avatar upload error:", error);
+      res.status(500).json({ error: "Upload failed" });
+    }
+  });
+
+  // Upload game thumbnail
+  app.post("/api/admin/upload/thumbnail", requireAdmin, requireAdminPassword, upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        return res.status(500).json({ error: "File storage not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY." });
+      }
+
+      const ext = req.file.originalname.split(".").pop() || "png";
+      const filename = `thumb-${Date.now()}.${ext}`;
+      const url = await uploadFile("thumbnails", filename, req.file.buffer, req.file.mimetype);
+
+      if (!url) {
+        return res.status(500).json({ error: "Upload failed" });
+      }
+
+      res.json({ url });
+    } catch (error) {
+      console.error("Thumbnail upload error:", error);
+      res.status(500).json({ error: "Upload failed" });
+    }
+  });
+
+  // Upload HTML game file
+  app.post("/api/admin/upload/game", requireAdmin, requireAdminPassword, upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const htmlContent = req.file.buffer.toString("utf-8");
+      res.json({ htmlContent });
+    } catch (error) {
+      console.error("Game upload error:", error);
+      res.status(500).json({ error: "Upload failed" });
+    }
+  });
+
+  // Serve HTML game content
+  app.get("/api/game/:id/play", async (req, res) => {
+    const game = await storage.getGameById(req.params.id);
+    if (!game) {
+      return res.status(404).send("Game not found");
+    }
+
+    if (game.type === "uploaded" && game.htmlContent) {
+      res.setHeader("Content-Type", "text/html");
+      res.send(game.htmlContent);
+    } else if (game.iframeUrl) {
+      res.redirect(game.iframeUrl);
+    } else {
+      res.status(404).send("Game content not available");
+    }
   });
 
   return httpServer;

@@ -130,6 +130,15 @@ export default function GameDetail() {
                 Flash content is loading...
               </p>
             </object>
+          ) : game.type === "uploaded" ? (
+            <iframe
+              id="gameFrame"
+              src={`/api/game/${game.id}/play`}
+              className="w-full h-full"
+              allowFullScreen
+              sandbox="allow-scripts allow-same-origin allow-forms"
+              data-testid="game-iframe-uploaded"
+            />
           ) : (
             <iframe
               id="gameFrame"
